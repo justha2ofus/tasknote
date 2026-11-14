@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>TaskNote</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="referrer" content="no-referrer">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TaskNote">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#F3F5F4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141615" media="(prefers-color-scheme: dark)">
+<style>
+:root{
+  --bg:#F3F5F4; --surface:#FFFFFF; --surface2:#ECEFEE; --line:#E1E5E3;
+  --text:#2A2F2D; --sub:#7B8380; --faint:#A9B0AD;
+  --mint:#6FAF9C; --mint-soft:#DCEEE8; --mint-ink:#3F7F6D;
+  --warn:#C98A3C; --shadow:0 1px 2px rgba(0,0,0,.04);
+  --sat-num:#8DAAC4; --sun-num:#CF9A9A;
+}
+html[data-theme="dark"]{
+  --bg:#141615; --surface:#1E2120; --surface2:#262A28; --line:#2E3331;
+  --text:#E4E8E6; --sub:#959D9A; --faint:#5F6764;
+  --mint:#7DBFAC; --mint-soft:#24352F; --mint-ink:#9ED3C3;
+  --warn:#D9A15A; --shadow:none;
+  --sat-num:#7C98B1; --sun-num:#B98585;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",sans-serif;font-size:15px}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+input,textarea,select{font:inherit;color:var(--text)}
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh;max-width:640px;margin:0 auto;padding-top:env(safe-area-inset-top);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+
+/* header */
+.hd{padding:14px 16px 6px;display:flex;align-items:flex-end;gap:10px}
+.hd .day{font-size:44px;font-weight:700;line-height:1;letter-spacing:-1px}
+.hd .ym{display:flex;flex-direction:column;line-height:1.15}
+.hd .ym b{font-size:16px;white-space:nowrap}
+.hd .ym .wdl{margin-left:9px;font-size:16px;color:var(--sub);font-weight:600}
+.hd .ym .wdl.sat{color:#6E95B5}.hd .ym .wdl.sun{color:#C07A7A}.hd .ym span{font-size:12px;color:var(--sub)}
+.hd .nav{margin-left:auto;display:flex;gap:6px;align-items:center}
+.ibtn{width:36px;height:36px;border-radius:50%;background:var(--surface2);display:grid;place-items:center}
+.ibtn svg{width:18px;height:18px}
+.today-btn{white-space:nowrap;height:36px;padding:0 14px;border-radius:18px;background:var(--surface2);font-size:13px;font-weight:600}
+.today-btn.on{background:var(--mint);color:#fff}
+.week{flex:none;padding:4px 10px 8px;overflow:hidden}
+.hd,.note{flex:none}
+.week .r7{display:grid;grid-template-columns:repeat(7,1fr);text-align:center}
+.week #weekDays{touch-action:pan-y;will-change:transform}
+.week .w{font-size:11px;color:var(--sub);padding-bottom:4px}
+.week .w.sat{color:#6E95B5}.week .w.sun{color:#C07A7A}
+.week button{height:42px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.week button span{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:16px;font-weight:600;color:var(--sub)}
+.week button.hsun span{color:var(--sun-num)}.week button.hsat span{color:var(--sat-num)}
+.week button.is-today span{font-weight:800;font-size:18px}
+.week button.is-today:not(.hsun):not(.hsat) span{color:var(--text)}
+.week button.sel span,.week button.sel.is-today span{color:var(--bg)!important}
+.week button.sel span{background:var(--text);color:var(--bg)}
+.week button i{width:4px;height:4px;border-radius:50%;background:transparent}
+.week button i.on{background:var(--mint)}
+
+/* banners */
+.note{margin:0 16px 6px;font-size:12px;color:var(--sub);background:var(--surface2);border-radius:8px;padding:6px 10px}
+
+/* scheduled */
+.scroll{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;overscroll-behavior:contain;scrollbar-width:thin}
+.sched{flex:none;padding:4px 16px 12px}
+.app.ibclosed .sched{flex:1 0 auto}
+.lbl{font-size:12px;color:var(--sub);margin:10px 2px 6px;display:flex;align-items:center;gap:6px}
+.empty{color:var(--faint);font-size:13px;text-align:center;padding:24px 0}
+.card{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 10px 10px 12px;margin-bottom:8px;box-shadow:var(--shadow)}
+.card .ic{width:32px;height:32px;border-radius:50%;background:var(--surface2);display:grid;place-items:center;flex:none;color:var(--sub)}
+.card .ic svg{width:16px;height:16px}
+.card .bd{flex:1;min-width:0;cursor:pointer}
+.card .tt{white-space:normal;word-break:break-word;overflow-wrap:anywhere;line-height:1.45}
+.card .mt{font-size:12px;color:var(--sub);margin-top:2px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+.card .mt .tm{color:var(--mint-ink);font-weight:600}
+.card .mt s{color:var(--warn)}
+.tag{font-size:11px;color:var(--mint-ink);background:var(--mint-soft);border-radius:6px;padding:1px 6px}
+.card.open{align-items:flex-start}
+.card.open .ic,.card.open .chk{margin-top:2px}
+.card.open .tt{white-space:normal}
+.card .mfull{margin-top:8px;padding:8px 10px;background:var(--surface2);border-radius:10px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;color:var(--text)}
+.card .mfull a{color:var(--mint-ink)}
+.card .mt .mm{flex:1 1 0;min-width:4em;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.durs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.durs button{padding:7px 2px 6px;border-radius:12px;background:var(--surface);border:1px solid var(--line);color:var(--text);font-size:13px;line-height:1.25;display:flex;flex-direction:column;align-items:center}
+.durs button small{font-size:11px;color:var(--faint);min-height:13px}
+.durs button.on{background:var(--mint);border-color:var(--mint);color:#fff}
+.durs button.on small{color:rgba(255,255,255,.85)}
+.chk{width:28px;height:28px;border-radius:50%;border:2px solid var(--faint);flex:none}
+.chk:hover{border-color:var(--mint)}
+.chk.done{background:var(--mint);border-color:var(--mint)}
+.card.virtual{opacity:.6;border-style:dashed}
+.card.virtual .chk{visibility:hidden}
+
+/* inbox */
+.sched .empty{padding:10px 0 4px}
+.holname{font-size:12px;color:#C07A7A;margin:8px 2px 0}
+.scroll.closed .ilist,.scroll.closed .tags{display:none}
+.ihd .exp{color:var(--sub);display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--surface)}
+.ihd .exp svg{width:16px;height:16px}
+.ihd .tog{margin-left:0!important;width:30px;height:30px;border-radius:50%;background:var(--surface)}
+.app.full .sched,.app.full .note{display:none!important}
+.ilist{scrollbar-width:thin}
+.ihd{flex:none;position:sticky;top:0;bottom:0;z-index:3;background:var(--surface2);border-top:1px solid var(--line);border-radius:18px 18px 0 0;display:flex;align-items:center;gap:8px;padding:12px 16px 8px;cursor:pointer;user-select:none}
+.ihd h2{font-size:17px;margin:0}
+.cnt{font-size:12px;background:var(--surface);color:var(--sub);border-radius:10px;padding:1px 8px}
+.ihd .tog{margin-left:auto;color:var(--sub);display:grid;place-items:center;width:28px;height:28px}
+.ihd .tog svg{width:18px;height:18px;transition:transform .15s}
+.scroll.closed .tog svg{transform:rotate(180deg)}
+.tags{background:var(--surface2);display:flex;gap:6px;overflow-x:auto;padding:0 16px 8px;flex:none}
+.tags button{font-size:12px;padding:4px 10px;border-radius:12px;background:var(--surface);color:var(--sub);white-space:nowrap;border:1px solid var(--line)}
+.tags button.on{background:var(--mint);color:#fff;border-color:var(--mint)}
+.ilist{background:var(--surface2);padding:0 16px calc(110px + env(safe-area-inset-bottom));flex:1 0 auto}
+.sortable .card:not(.virtual){-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.card.pressing{transform:scale(.985);transition:transform .25s}
+.card.dragging{opacity:.85;border-color:var(--mint);box-shadow:0 6px 18px rgba(0,0,0,.12);position:relative;z-index:2}
+
+.fab{position:fixed;right:max(18px,calc(50% - 302px));bottom:calc(12px + env(safe-area-inset-bottom));width:54px;height:54px;border-radius:50%;background:var(--mint);color:#fff;display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.18);z-index:5}
+.gate{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg);z-index:50}
+.gate-box{max-width:420px;background:var(--surface2);border-radius:18px;padding:22px 20px;line-height:1.7;font-size:14px}
+.gate-ttl{font-size:20px;font-weight:700;margin-bottom:8px}
+.gate-box b{color:var(--mint-ink)}
+.fab svg{width:26px;height:26px}
+
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:flex-end;justify-content:center;z-index:20}
+.ov.show{display:flex}
+.sheet{background:var(--bg);width:100%;max-width:640px;max-height:calc(92% - env(safe-area-inset-top));overflow-y:auto;border-radius:18px 18px 0 0;padding:16px 16px calc(24px + env(safe-area-inset-bottom))}
+.sheet h3{margin:0 0 12px;font-size:17px;display:flex;align-items:center}
+.sheet h3 .x{margin-left:auto}
+.fld{margin-bottom:12px}
+.fld>label{display:block;font-size:12px;color:var(--sub);margin-bottom:4px}
+.inp{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:16px;outline:none}
+.inp:focus{border-color:var(--mint)}
+.inp[type="date"],.inp[type="time"]{-webkit-appearance:none;appearance:none;display:block;width:100%;min-width:0;max-width:100%;height:46px;line-height:24px;text-align:left}
+.inp::-webkit-date-and-time-value{text-align:left;margin:0}
+.dt{position:relative;min-width:0}
+.dt.unset::after{content:'未設定';position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--faint);font-size:15px;pointer-events:none}
+.dt.unset input{color:transparent}
+.dt.unset input:focus{color:var(--text)}
+.dt.unset:focus-within::after{display:none}
+textarea.inp{min-height:84px;resize:vertical}
+.row{display:flex;gap:8px}.row>*{flex:1;min-width:0}
+.quick{display:flex;gap:6px;margin-top:6px}
+.quick button,.seg button,.wd button{font-size:13px;padding:6px 12px;border-radius:14px;background:var(--surface);border:1px solid var(--line);color:var(--sub)}
+.quick button.on,.seg button.on,.wd button.on{background:var(--mint);border-color:var(--mint);color:#fff}
+.seg,.wd{display:flex;gap:6px;flex-wrap:wrap}
+.wd button{width:38px;padding:6px 0}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chips button{font-size:12px;padding:3px 9px;border-radius:10px;background:var(--surface);border:1px solid var(--line);color:var(--sub)}
+.chips button.on{background:var(--mint-soft);color:var(--mint-ink);border-color:var(--mint)}
+.acts{display:flex;gap:8px;margin-top:16px}
+.btn{flex:1;padding:12px;border-radius:12px;background:var(--surface);border:1px solid var(--line);font-weight:600}
+.btn.pri{background:var(--mint);border-color:var(--mint);color:#fff}
+.btn.dng{color:#C06A6A;flex:0 0 auto;padding:12px 16px}
+.menu button.mi{display:flex;width:100%;align-items:center;gap:10px;padding:13px 4px;border-bottom:1px solid var(--line);text-align:left}
+.small{font-size:12px;color:var(--sub);line-height:1.6}
+
+/* history */
+.hist-day{font-size:12px;color:var(--sub);margin:14px 2px 6px}
+.hist .card .tt.dn{text-decoration:line-through;color:var(--sub)}
+.mini{font-size:12px;padding:6px 10px;border-radius:10px;background:var(--surface2);color:var(--mint-ink);font-weight:600;flex:none}
+.mini.dng{color:#C06A6A}
+.up-day{font-size:13px;font-weight:600;color:var(--sub);margin:14px 2px 6px;cursor:pointer}
+.up-day.sun{color:#C07A7A}.up-day.sat{color:#6E95B5}
+.up-day span{font-weight:400;font-size:12px;margin-left:8px}
+.up-item{cursor:pointer;padding:9px 12px}
+.trow{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:8px}
+.trow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trow .nm small{color:var(--faint);margin-left:6px}
+.trow input{flex:1;min-width:0;padding:6px 8px;font-size:15px}
+
+/* calendar */
+.cal-hd{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.cal-hd b{flex:1;text-align:center}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.cal .w{font-size:11px;color:var(--sub)}
+.cal button{height:40px;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:14px}
+.cal button.hsun{color:#C07A7A}.cal button.hsat{color:#6E95B5}
+.cal button.out{color:var(--faint)}
+.cal button.sel{background:var(--text);color:var(--bg)}
+.cal button.td{font-weight:800}
+.cal button i{width:4px;height:4px;border-radius:50%;margin-top:2px}
+.cal button i.on{background:var(--mint)}
+
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--text);color:var(--bg);border-radius:12px;padding:10px 14px;font-size:13px;display:none;gap:14px;align-items:center;z-index:30;max-width:90%}
+.toast.show{display:flex}
+.toast button{color:var(--mint);font-weight:700;white-space:nowrap}
+.toast span{white-space:nowrap}
+</style>
+</head>
+<body>
+<div class="gate" id="gate" style="display:none">
+  <div class="gate-box">
+    <div class="gate-ttl">TaskNote</div>
+    <div id="gateMsg"></div>
+  </div>
+</div>
+<div class="app">
+  <header class="hd">
+    <div class="day" id="hDay"></div>
+    <div class="ym"><b id="hMonth"></b><span id="hYear"></span></div>
+    <div class="nav">
+      <button class="ibtn" id="prevBtn" aria-label="前の日"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <button class="today-btn" id="todayBtn">今日</button>
+      <button class="ibtn" id="nextBtn" aria-label="次の日"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></button>
+      <button class="ibtn" id="calBtn" aria-label="カレンダー"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg></button>
+      <button class="ibtn" id="menuBtn" aria-label="メニュー"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h14"/></svg></button>
+    </div>
+  </header>
+  <div class="week" id="week"></div>
+  <div class="note" id="note" style="display:none"></div>
+  <div class="scroll" id="inbox">
+  <main class="sched" id="sched"></main>
+    <div class="ihd" id="inboxHd"><h2>あとでやる</h2><span class="cnt" id="inboxCnt">0</span>
+      <button class="exp" id="expBtn" aria-label="広げる" style="margin-left:6px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path id="expPath" d="M8 10l4-4 4 4M8 18l4-4 4 4"/></svg></button>
+      <button class="tog" id="togBtn" aria-label="畳む"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button></div>
+    <div class="tags" id="tagBar"></div>
+    <div class="ilist sortable" id="ilist"></div>
+  </div>
+</div>
+<button class="fab" id="fab" aria-label="追加"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+
+<!-- edit -->
+<div class="ov" id="editOv"><div class="sheet">
+  <h3><span id="editTitle">タスクを追加</span><button class="x ibtn" data-close="editOv">✕</button></h3>
+  <div class="fld"><textarea class="inp" id="fTitle" placeholder="タスク名" autocomplete="off" rows="1" style="resize:none;overflow:hidden;min-height:0;line-height:1.45"></textarea></div>
+  <div class="fld"><label>いつやる？</label>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="quick" id="fQuick" style="flex-wrap:wrap">
+        <button data-q="later">あとでやる</button><button data-q="today">今日</button><button data-q="tomorrow">明日</button><button data-q="sel">表示中の日</button>
+      </div>
+      <button class="btn pri" id="fSaveQuick" style="flex:none;margin-left:auto;padding:7px 18px;margin-top:6px;font-size:14px;border-radius:14px">保存</button>
+    </div>
+  </div>
+  <div class="fld"><div class="row">
+    <div><label class="small">日付</label><div class="dt"><input class="inp" type="date" id="fDate"></div></div>
+    <div><label class="small">開始時刻</label><div class="dt"><input class="inp" type="time" id="fTime"></div></div>
+  </div></div>
+  <div class="fld"><label>所要時間</label>
+    <div class="durs" id="fDurs"></div>
+    <div class="row" style="margin-top:8px;align-items:flex-end"><div><label class="small">終了時刻で指定</label><div class="dt"><input class="inp" type="time" id="fEnd"></div></div><div class="small" id="fDurNote" style="padding-bottom:10px"></div></div>
+  </div>
+  <div class="fld"><label>繰り返し</label>
+    <div class="seg" id="fRep"><button data-r="">なし</button><button data-r="daily">毎日</button><button data-r="weekly">毎週</button><button data-r="monthly">毎月</button></div>
+    <div class="wd" id="fWd" style="margin-top:8px"></div>
+  </div>
+  <div class="fld"><label>タグ（スペース・カンマ区切り）</label>
+    <input class="inp" id="fTags" placeholder="例：買い物 手続き" autocomplete="off">
+    <div class="chips" id="fTagChips"></div></div>
+  <div class="fld"><label>メモ</label><textarea class="inp" id="fMemo"></textarea></div>
+  <div class="acts"><button class="btn dng" id="fDel">削除</button><button class="btn" data-close="editOv">キャンセル</button><button class="btn pri" id="fSave">保存</button></div>
+</div></div>
+
+<!-- menu -->
+<div class="ov" id="menuOv"><div class="sheet menu">
+  <h3>メニュー<button class="x ibtn" data-close="menuOv">✕</button></h3>
+  <button class="mi" id="mHist">🕘　履歴（完了・削除したタスク）</button>
+  <button class="mi" id="mUp">📅　今後の予定（明日以降）</button>
+  <button class="mi" id="mTags">🏷　タグの管理</button>
+  <div class="fld" style="margin-top:14px"><label>表示モード</label>
+    <div class="seg" id="themeSeg"><button data-t="auto">自動</button><button data-t="light">ライト</button><button data-t="dark">ダーク</button></div></div>
+  <div class="fld bk"><label>控え置き場（GAS）</label>
+    <p class="small" id="bkStatus" style="margin:0 0 8px"></p>
+    <div class="seg"><button id="bkSend">今すぐ控えを送る</button><button id="bkRestore">控えから戻す</button><button id="bkSetBtn">設定</button></div>
+    <div id="bkSet" style="display:none;margin-top:10px">
+      <input class="inp" id="bkUrl" placeholder="GASのウェブアプリのURL（https://script.google.com/…/exec）" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <input class="inp" id="bkKey" placeholder="合言葉" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" style="margin-top:8px">
+      <div class="seg" style="margin-top:8px"><button id="bkSave">保存して接続テスト</button><button id="bkClear">設定を消す</button></div>
+      <p class="small">URLと合言葉はこの端末の中にだけ保存されます。</p>
+    </div>
+  </div>
+  <div class="fld"><label>データの書き出し</label>
+    <div class="seg"><button id="expJson">JSONを保存</button><button id="expCsv">CSVを保存</button><button id="cpJson">JSONをコピー</button></div>
+    <p class="small">JSONは全項目（履歴含む）を含み、読み込みや他アプリへの移行に使えます。CSVはスプレッドシート向けです。</p></div>
+  <div class="fld"><label>データの読み込み（JSON）</label>
+    <div class="seg"><label class="mini" style="cursor:pointer">ファイルを選ぶ<input type="file" id="impFile" accept=".json,application/json" hidden></label></div>
+    <textarea class="inp" id="impText" placeholder="ここにJSONを貼り付けても読み込めます" style="margin-top:8px;min-height:60px"></textarea>
+    <div class="seg" style="margin-top:6px"><button id="impBtn">貼り付けた内容を読み込む</button></div>
+    <p class="small">同じIDのタスクは上書き、新しいものは追加されます（既存のタスクは消えません）。</p></div>
+  <p class="small" id="storeInfo"></p>
+  <div class="fld" style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px"><label>すべてのデータを削除</label>
+    <p class="small" style="margin-top:0">予定・あとでやる・履歴・タグをすべて消します。元に戻せないので、必要なら先にJSONを書き出してください。</p>
+    <button class="btn dng" id="wipeBtn" style="width:100%">すべて削除する</button></div>
+</div></div>
+
+<!-- history -->
+<div class="ov" id="histOv"><div class="sheet hist">
+  <h3>履歴<button class="x ibtn" data-close="histOv">✕</button></h3>
+  <div class="seg" id="histSeg"><button data-h="done" class="on">完了</button><button data-h="deleted">削除</button></div>
+  <div id="histList"></div>
+</div></div>
+
+<!-- restore -->
+<div class="ov" id="rsOv"><div class="sheet">
+  <h3>控えから戻す<button class="x ibtn" data-close="rsOv">✕</button></h3>
+  <p class="small" style="margin-top:0">選んだ控えの状態に、この端末のデータを丸ごと置き換えます。置き換える直前の状態は1つだけ残るので、すぐなら元に戻せます。</p>
+  <div id="rsList"><div class="empty">読み込み中…</div></div>
+  <div id="rsUndo" style="margin-top:12px"></div>
+</div></div>
+
+<!-- upcoming -->
+<div class="ov" id="upOv"><div class="sheet">
+  <h3>今後の予定<button class="x ibtn" data-close="upOv">✕</button></h3>
+  <p class="small" style="margin-top:0">明日以降に日付が入っているタスクです。押すとその日を開きます。繰り返しタスクは次の1回だけ表示します。</p>
+  <div id="upList"></div>
+</div></div>
+
+<!-- tags -->
+<div class="ov" id="tagOv"><div class="sheet">
+  <h3>タグの管理<button class="x ibtn" data-close="tagOv">✕</button></h3>
+  <p class="small" style="margin-top:0">名前を変えると、そのタグが付いたタスクすべてに反映されます（同じ名前のタグがあれば1つにまとまります）。削除すると、すべてのタスクからそのタグが外れます。タスク自体は消えません。</p>
+  <div id="tagList"></div>
+</div></div>
+
+<!-- calendar -->
+<div class="ov" id="calOv"><div class="sheet">
+  <div class="cal-hd"><button class="ibtn" id="calPrev">‹</button><b id="calTitle"></b><button class="ibtn" id="calNext">›</button><button class="ibtn" data-close="calOv">✕</button></div>
+  <div class="cal" id="calGrid"></div>
+</div></div>
+
+<div class="toast" id="toast"><span id="toastMsg"></span><button id="toastUndo">元に戻す</button></div>
+
+<script src="app.js"></script>
+</body>
+</html>
