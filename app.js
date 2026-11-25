@@ -460,25 +460,49 @@ $('fDel').onclick=()=>{if(S.editing){softDelete(S.editing);closeOv('editOv');}};
     e.preventDefault();
     if(!drag.moved&&Math.abs(e.clientY-drag.ay)<10){follow();return;}
     drag.moved=true;
-    const r=root.getBoundingClientRect(), dy=e.clientY-drag.ay;
-    if(e.clientY<r.top+30&&dy<0) root.scrollTop-=6; else if(e.clientY>r.bottom-40&&dy>0) root.scrollTop+=6;
+    place(); autoScroll();
+  });
+  // 指の位置に合わせて、つかんでいるカードの置き場所を決める
+  function place(){
     const list=drag.list, cards=[...list.querySelectorAll('.card:not(.dragging):not(.virtual)')];
     // compare against where cards really sit (ignore their in-flight slide animation)
     let before=null;
-    const dh=drag.card.offsetHeight, cy=e.clientY-drag.grabOff+dh/2;   // center of the card being dragged
+    const dh=drag.card.offsetHeight, cy=drag.lastY-drag.grabOff+dh/2;   // center of the card being dragged
     for(const c of cards){const b=c.getBoundingClientRect(), top=b.top-animY(c);if(cy<top+b.height/2){before=c;break;}}
     if(before){if(drag.card.nextSibling!==before) flipMove(()=>list.insertBefore(drag.card,before));}
     else{const last=cards[cards.length-1];if(last&&last.nextSibling!==drag.card) flipMove(()=>last.after(drag.card));}
     follow();
-  });
+  }
+  // 画面の上端・下端に指を置いている間は、止めていても自動でスクロールし続ける
+  // （下端は「あとでやる」の見出しが貼り付く分だけ広めに取る。端に近いほど速い）
+  let asRaf=0;
+  function edgeSpeed(){
+    const r=root.getBoundingClientRect(), y=drag.lastY, ZT=70, ZB=110, MAX=14;
+    if(y<r.top+ZT) return -Math.ceil(MAX*Math.min(1,(r.top+ZT-y)/ZT));
+    if(y>r.bottom-ZB) return Math.ceil(MAX*Math.min(1,(y-(r.bottom-ZB))/ZB));
+    return 0;
+  }
+  function autoScroll(){
+    if(asRaf) return;
+    const step=()=>{
+      asRaf=0;
+      if(!drag||!drag.active||!drag.moved) return;
+      const v=edgeSpeed(); if(!v) return;
+      const before=root.scrollTop;
+      root.scrollTop=Math.max(0,Math.min(root.scrollHeight-root.clientHeight,before+v));
+      if(root.scrollTop!==before) place();
+      if(root.scrollTop!==before) asRaf=requestAnimationFrame(step);
+    };
+    asRaf=requestAnimationFrame(step);
+  }
   document.addEventListener('touchmove',e=>{if(drag&&drag.active)e.preventDefault();},{passive:false});
   root.addEventListener('scroll',()=>{if(drag&&!drag.active&&Math.abs(root.scrollTop-drag.st)>2)cancel();},{passive:true});
   document.addEventListener('contextmenu',e=>{if(e.target.closest&&e.target.closest('.sortable .card'))e.preventDefault();});
   function release(){S.dragBusy=false;if(S.renderPending)render();}
-  function cancel(){ if(!drag) return; clearTimeout(drag.timer); drag.card.classList.remove('pressing','dragging'); drag.card.style.transform=''; drag=null; release(); }
+  function cancel(){ if(asRaf){cancelAnimationFrame(asRaf);asRaf=0;} if(!drag) return; clearTimeout(drag.timer); drag.card.classList.remove('pressing','dragging'); drag.card.style.transform=''; drag=null; release(); }
   function end(e){
     if(!drag||(e&&e.pointerId!==drag.pid)) return;
-    clearTimeout(drag.timer);
+    clearTimeout(drag.timer); if(asRaf){cancelAnimationFrame(asRaf);asRaf=0;}
     const d=drag; drag=null;
     d.card.classList.remove('pressing');
     if(!d.active){release();return;}
