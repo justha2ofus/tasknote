@@ -122,12 +122,23 @@ function setStoreMode(){
 
 /* ---------- rollover: 未完了の予定を「あとでやる」へ ---------- */
 function minOrder(){let m=0;Object.values(S.tasks).forEach(t=>{if(t.status==='open'&&!t.date&&typeof t.order==='number')m=Math.min(m,t.order);});return m;}
+// 繰り返しタスクの持ち越し：前日の回を完了しなかったときだけ、その1回分を今日の欄に「前日分」として残す。
+// 持ち越し分は今日のうちに完了しなければ消える（あとでやるには戻さず、2回分は溜まらない）。
 function rollover(){
-  const td=today(); S.today=td;
+  const td=today(), yd=addDays(td,-1); S.today=td;
   Object.values(S.tasks).forEach(t=>{
     if(t.status!=='open'||!t.date||t.date>=td) return;
+    if(t.carryOf){ hardDelete(t.id); return; }            // 期限切れの持ち越し分
     const u=plain(t);
-    if(u.repeat&&u.repeat.type){u.date=occursOn(u,td)?td:nextOcc(u,td);}
+    if(u.repeat&&u.repeat.type){
+      // 前日に予定されていた回が未完了なら、1回分だけ持ち越す
+      if(u.date<=yd&&occursOn(u,yd)&&!Object.values(S.tasks).some(x=>x.carryOf===u.id&&x.carryDate===yd)){
+        const now=new Date().toISOString();
+        persist({id:newId(),title:u.title,memo:u.memo||null,tags:(u.tags||[]).slice(),dur:u.dur||null,status:'open',
+          date:td,time:null,repeat:null,carryOf:u.id,carryDate:yd,carryTime:u.time||null,createdAt:now});
+      }
+      u.date=occursOn(u,td)?td:nextOcc(u,td);
+    }
     else{u.rolledFrom={date:u.date,time:u.time||null};u.date=null;u.order=minOrder()-1;}
     persist(u);
   });
@@ -140,6 +151,7 @@ function cardHtml(t,opt){
   opt=opt||{};
   const timed=!!t.time;
   let meta='';
+  if(t.carryOf){meta+='<span class="carry">前日分</span><s>'+esc(fmtMD(t.carryDate))+(t.carryTime?' '+esc(t.carryTime):'')+'</s>';}
   if(opt.inbox&&t.rolledFrom){meta+='<s>'+esc(fmtMD(t.rolledFrom.date))+(t.rolledFrom.time?' '+esc(t.rolledFrom.time):'')+'</s>';}
   if(!opt.inbox&&timed) meta+='<span class="tm">'+esc(t.time)+(t.dur?'〜'+esc(endTime(t.time,t.dur)):'')+'</span>';
   if(t.dur&&(opt.inbox||!timed)) meta+='<span>'+durLabel(t.dur)+'</span>';
@@ -182,7 +194,11 @@ function render(){
   if(!items.length) h='<div class="empty">この日の予定はありません</div>';
   if(hn) h='<div class="holname">'+esc(hn)+'</div>'+h;
   if(timed.length){if(untimed.length)h+='<div class="lbl">時間順</div>';h+=timed.map(x=>cardHtml(x.t,{virtual:x.v})).join('');}
-  if(untimed.length){h+='<div class="lbl">時間指定なし</div><div class="sortable" id="untimedList">'+untimed.map(x=>cardHtml(x.t,{virtual:x.v,sortable:!x.v})).join('')+'</div>';}
+  if(untimed.length){
+    const carried=untimed.filter(x=>x.t.carryOf), rest=untimed.filter(x=>!x.t.carryOf);
+    h+='<div class="lbl">時間指定なし</div>'+carried.map(x=>cardHtml(x.t,{})).join('');
+    if(rest.length) h+='<div class="sortable" id="untimedList">'+rest.map(x=>cardHtml(x.t,{virtual:x.v,sortable:!x.v})).join('')+'</div>';
+  }
   $('sched').innerHTML=h;
   // inbox
   let inbox=all.filter(t=>t.status==='open'&&!t.date).sort((a,b)=>(a.order||0)-(b.order||0)||String(a.createdAt).localeCompare(String(b.createdAt)));
@@ -219,7 +235,7 @@ function complete(id){
     const u=plain(t); u.date=nextOcc(u,u.date); persist(u);
     toast('完了（次回 '+fmtMD(u.date)+'）',()=>{hardDelete(copy.id);persist(before);});
   }else{
-    const u=plain(t); u.status='done'; u.doneAt=now; persist(u);
+    const u=plain(t); u.status='done'; u.doneAt=now; if(u.carryOf) u.date=u.carryDate; persist(u);
     toast('完了しました',()=>persist(before));
   }
   render();
@@ -396,6 +412,7 @@ $('fSave').onclick=()=>{
     if(fRepType==='weekly'&&!occursOn(t,date)) date=nextOcc(t,date);
   }else t.repeat=null;
   if(date&&t.date!==date) delete t.rolledFrom;
+  if(t.carryOf&&t.date!==date){delete t.carryOf;delete t.carryDate;delete t.carryTime;}
   if(t.date!==date&&!(t.repeat&&t.repeat.type)) delete t.dayOrder;
   if(!date&&(!old||old.date)) t.order=minOrder()-1;
   t.date=date;
@@ -762,7 +779,7 @@ $('wipeBtn').onclick=()=>{
 };
 
 /* ---------- export / import ---------- */
-const FIELDS=['id','title','memo','status','date','time','dur','tags','repeat','order','dayOrder','rolledFrom','createdAt','updatedAt','doneAt','repeatOf'];
+const FIELDS=['id','title','memo','status','date','time','dur','tags','repeat','order','dayOrder','rolledFrom','createdAt','updatedAt','doneAt','repeatOf','carryOf','carryDate','carryTime'];
 function exportObj(){return {app:'tasknote',version:1,exportedAt:new Date().toISOString(),tasks:Object.values(S.tasks).map(plain)};}
 function toCsv(){
   const cell=v=>{if(v==null)return '';if(Array.isArray(v))v=v.join(' ');else if(typeof v==='object')v=JSON.stringify(v);v=String(v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
